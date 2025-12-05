@@ -1,105 +1,75 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-export async function POST(request: NextRequest) {
+export default async function handler(req: any, res: any) {
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
   try {
-    const data = await request.json();
+    const apiKey = process.env.API_KEY;
+    console.log('API_KEY exists:', !!apiKey);
 
-    if (!process.env.API_KEY) {
-      return NextResponse.json(
-        { error: 'API_KEY not configured on server' },
-        { status: 500 }
-      );
+    if (!apiKey) {
+      res.status(500).json({ error: 'API Key not configured on server' });
+      return;
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const data = req.body;
+    console.log('Received data:', { type: data.type, area: data.area });
+
+    const genAI = new GoogleGenerativeAI({ apiKey });
 
     const prompt = `
-      Đóng vai là một chuyên gia Môi giới và Marketing Bất Động Sản hàng đầu tại Việt Nam (Top Seller trên batdongsan.com.vn).
-      
-      Nhiệm vụ 1: Phân tích chiến lược.
-      Dựa trên kinh nghiệm thực tế từ các tin đăng VIP/Nổi bật trên batdongsan.com.vn, hãy đưa ra 3-4 điểm phân tích quan trọng về cách viết tin hiệu quả cho loại hình bất động sản này (cấu trúc, từ khóa, tâm lý khách hàng).
-      
-      Nhiệm vụ 2: Tối ưu hóa tin đăng bán/cho thuê dựa trên thông tin sau:
-      - Loại hình: ${data.type}
-      - Diện tích: ${data.area}
-      - Giá: ${data.price}
-      - Vị trí: ${data.location}
-      - Dự án: ${data.project}
-      - Tiện ích: ${data.amenities}
-      - Pháp lý: ${data.legal}
-      - Liên hệ: ${data.contact}
-      
-      Nhiệm vụ 3: Tạo nội dung chi tiết và trả về JSON với các field: marketAnalysis, hookTitles, titleErrors, fbContent, keywords, metaDescription, hotDescription, bestTemplate, postingSteps
-    `;
+Bạn là chuyên gia viết content bất động sản chuyên nghiệp. Hãy tạo nội dung SEO cao cấp cho tin đăng bất động sản dựa trên thông tin sau:
 
-    const responseSchema = {
-      type: Type.OBJECT,
-      properties: {
-        marketAnalysis: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-        },
-        hookTitles: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              strategy: { type: Type.STRING },
-              title: { type: Type.STRING }
-            },
-          },
-        },
-        titleErrors: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-        },
-        fbContent: { type: Type.STRING },
-        keywords: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-        },
-        metaDescription: { type: Type.STRING },
-        hotDescription: { type: Type.STRING },
-        bestTemplate: {
-          type: Type.OBJECT,
-          properties: {
-            rationale: { type: Type.STRING },
-            finalContent: { type: Type.STRING },
-          },
-        },
-        postingSteps: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-        },
-      },
-    };
+Loại hình: ${data.type}
+Diện tích: ${data.area}
+Giá: ${data.price}
+Vị trí: ${data.location}
+Dự án (nếu có): ${data.project}
+Tiện ích: ${data.amenities}
+Pháp lý: ${data.legal}
+Liên hệ: ${data.contact}
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: responseSchema,
-        temperature: 0.8,
+Hãy tạo:
+1. 3 hook titles (tiêu đề gây chú ý)
+2. 1 mô tả hot (mô tả nóng hấp dẫn khách hàng)
+3. 5 highlight points chính (các điểm nổi bật)
+4. SEO keywords (danh sách từ khóa SEO)
+
+Trả lời dưới dạng JSON theo định dạng sau:
+{
+  "hookTitles": [{"title": "...", "keywords": [...]}, ...],
+  "hotDescription": "...",
+  "highlights": [{"title": "...", "description": "..."}, ...],
+  "seoKeywords": [...]
+}`;
+
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+    const response = await model.generateContent({
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: prompt }],
+        },
+      ],
+      generationConfig: {
+        responseType: 'application/json',
+        temperature: 0.7,
       },
     });
 
-    const text = response.text;
-    if (!text) {
-      return NextResponse.json(
-        { error: 'No response from AI' },
-        { status: 500 }
-      );
-    }
+    const responseText = response.response.text();
+    const result = JSON.parse(responseText);
 
-    const result = JSON.parse(text);
-    return NextResponse.json(result);
+    res.status(200).json(result);
   } catch (error: any) {
     console.error('API Error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    res.status(500).json({
+      error: error.message || 'Internal server error',
+      details: error.toString(),
+    });
   }
 }
