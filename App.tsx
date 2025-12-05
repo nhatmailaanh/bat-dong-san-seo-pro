@@ -1,14 +1,12 @@
-
 import React, { useState } from 'react';
 import InputForm from './components/InputForm';
 import ResultDisplay from './components/ResultDisplay';
 import { PropertyData, GeneratedContent, LoadingState, HFAnalysisResult } from './types';
-import { generateRealEstateContent } from './services/geminiService';
-import { 
-  checkContentQuality, 
-  analyzeSEOKeywords, 
-  detectAndFixErrors, 
-  improveReadability 
+import {
+  checkContentQuality,
+  analyzeSEOKeywords,
+  detectAndFixErrors,
+  improveReadability
 } from './services/hfInferenceService';
 
 const initialData: PropertyData = {
@@ -47,8 +45,20 @@ const App: React.FC = () => {
     setError(null);
 
     try {
-      // 1. Generate Content with Gemini
-      const generatedContent = await generateRealEstateContent(formData);
+      // 1. Generate Content with Gemini via API
+      const response = await fetch('/api/generateContent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate content');
+      }
+
+      const generatedContent: GeneratedContent = await response.json();
       setResult(generatedContent);
       setLoadingState(LoadingState.SUCCESS);
 
@@ -67,7 +77,6 @@ const App: React.FC = () => {
 
       setHfAnalysis({ quality, seo, grammar, readability });
       setHfLoading(false);
-
     } catch (err: any) {
       setError("Đã có lỗi xảy ra khi tạo nội dung. Vui lòng thử lại. " + (err.message || ''));
       setLoadingState(LoadingState.ERROR);
@@ -87,7 +96,7 @@ const App: React.FC = () => {
             <h1 className="text-xl font-bold text-gray-800 tracking-tight">Bất Động Sản <span className="text-blue-600">SEO Pro</span></h1>
           </div>
           <div className="flex items-center gap-3">
-             <span className="text-xs font-medium text-purple-600 bg-purple-50 px-3 py-1 rounded-full border border-purple-100">
+            <span className="text-xs font-medium text-purple-600 bg-purple-50 px-3 py-1 rounded-full border border-purple-100">
               AI Analysis (HuggingFace)
             </span>
             <div className="text-xs font-medium text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
@@ -111,8 +120,8 @@ const App: React.FC = () => {
             />
             {error && (
               <div className="mt-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm flex items-start gap-2">
-                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                 {error}
+                <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                {error}
               </div>
             )}
           </div>
@@ -126,21 +135,19 @@ const App: React.FC = () => {
                 <p className="text-sm">AI sẽ giúp bạn tạo tin đăng chuẩn SEO trong vài giây.</p>
               </div>
             )}
-
             {loadingState === LoadingState.LOADING && (
               <div className="space-y-6">
-                 {/* Skeleton Loaders */}
-                 {[1, 2, 3].map(i => (
-                   <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 animate-pulse">
-                     <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
-                     <div className="h-3 bg-gray-200 rounded w-full mb-2"></div>
-                     <div className="h-3 bg-gray-200 rounded w-5/6 mb-2"></div>
-                     <div className="h-3 bg-gray-200 rounded w-4/6"></div>
-                   </div>
-                 ))}
+                {/* Skeleton Loaders */}
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
+                    <div className="h-3 bg-gray-200 rounded w-full mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-5/6 mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-4/6"></div>
+                  </div>
+                ))}
               </div>
             )}
-
             {loadingState === LoadingState.SUCCESS && result && (
               <ResultDisplay 
                 result={result} 
