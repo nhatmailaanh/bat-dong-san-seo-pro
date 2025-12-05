@@ -1,24 +1,28 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export default async function handler(req: any, res: any) {
+  // Only allow POST requests
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
+    // Get API key from environment variables
     const apiKey = process.env.API_KEY;
-    console.log('API_KEY exists:', !!apiKey);
-
+    
     if (!apiKey) {
-      res.status(500).json({ error: 'API Key not configured on server' });
-      return;
+      console.error('API_KEY environment variable is not set');
+      return res.status(500).json({ error: 'API Key not configured on server' });
     }
 
     const data = req.body;
-    console.log('Received data:', { type: data.type, area: data.area });
+    
+    if (!data) {
+      return res.status(400).json({ error: 'No data provided' });
+    }
 
-    const genAI = new GoogleGenerativeAI({ apiKey });
+    // Initialize Gemini AI with API key
+    const genAI = new GoogleGenerativeAI({ apiKey: apiKey });
 
     const prompt = `
 Bạn là chuyên gia viết content bất động sản chuyên nghiệp. Hãy tạo nội dung SEO cao cấp cho tin đăng bất động sản dựa trên thông tin sau:
@@ -46,8 +50,10 @@ Trả lời dưới dạng JSON theo định dạng sau:
   "seoKeywords": [...]
 }`;
 
+    // Get the Gemini model
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
+    // Call Gemini API
     const response = await model.generateContent({
       contents: [
         {
@@ -61,13 +67,18 @@ Trả lời dưới dạng JSON theo định dạng sau:
       },
     });
 
+    // Extract the response text
     const responseText = response.response.text();
+    
+    // Parse the JSON response
     const result = JSON.parse(responseText);
 
-    res.status(200).json(result);
+    // Return the result
+    return res.status(200).json(result);
   } catch (error: any) {
     console.error('API Error:', error);
-    res.status(500).json({
+    
+    return res.status(500).json({
       error: error.message || 'Internal server error',
       details: error.toString(),
     });
